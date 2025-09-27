@@ -1,2 +1,5 @@
-# sm-pump-controller
-StepperMotor-Pump Controller Board
+# StepperMotor-Pump Controller Board
+
+This repo contains details on the Chill Division SM-Pump Controller Board
+
+Firmware binaries for the STM32 are under Releases, as is yaml for ESPHome

@@ -1,0 +1,609 @@
+esphome:
+  name: gr1-abd
+  friendly_name: gr1-abd
+  # This automation runs once when the ESP boots up.
+  # The priority is set to 200 to ensure it runs AFTER both globals (800)
+  # and switches (250) have been restored from flash memory.
+  on_boot:
+    priority: 200
+    then:
+      # ===================================================================
+      # NEW: Restore the state of the number sliders from our global variables.
+      # This happens after the globals themselves have been restored from flash.
+      # ===================================================================
+      - number.set:
+          id: motor_1_speed
+          value: !lambda 'return id(m1_speed);'
+      - number.set:
+          id: motor_2_speed
+          value: !lambda 'return id(m2_speed);'
+      - number.set:
+          id: motor_3_speed
+          value: !lambda 'return id(m3_speed);'
+      - number.set:
+          id: motor_4_speed
+          value: !lambda 'return id(m4_speed);'
+
+      # This part sets the initial state of the direction text sensors
+      # based on the (restored) state of the direction switches.
+      - lambda: |-
+          // Motor 1
+          if (id(motor_1_direction).state) {
+            id(motor_1_direction_text).publish_state("Forward");
+          } else {
+            id(motor_1_direction_text).publish_state("Reverse");
+          }
+          // Motor 2
+          if (id(motor_2_direction).state) {
+            id(motor_2_direction_text).publish_state("Forward");
+          } else {
+            id(motor_2_direction_text).publish_state("Reverse");
+          }
+          // Motor 3
+          if (id(motor_3_direction).state) {
+            id(motor_3_direction_text).publish_state("Forward");
+          } else {
+            id(motor_3_direction_text).publish_state("Reverse");
+          }
+          // Motor 4
+          if (id(motor_4_direction).state) {
+            id(motor_4_direction_text).publish_state("Forward");
+          } else {
+            id(motor_4_direction_text).publish_state("Reverse");
+          }
+
+esp32:
+  board: m5stack-core-esp32
+  framework:
+    type: esp-idf
+
+# ===================================================================
+# NEW: Global variables to store the motor speeds.
+# `restore_value: yes` tells ESPHome to save these to flash memory
+# whenever they change and load them back on boot.
+# ===================================================================
+globals:
+  - id: m1_speed
+    type: float
+    restore_value: yes
+    initial_value: '1700'
+  - id: m2_speed
+    type: float
+    restore_value: yes
+    initial_value: '1700'
+  - id: m3_speed
+    type: float
+    restore_value: yes
+    initial_value: '1700'
+  - id: m4_speed
+    type: float
+    restore_value: yes
+    initial_value: '1700'
+  # ===================================================================
+  # NEW: Global variables for keeping track of dosed amounts
+  # ===================================================================
+  # These variables will hold the total amount dosed for each pump.
+  # They are saved to flash memory so the values are not lost on reboot.
+  - id: m1_dosed_total
+    type: float
+    restore_value: yes
+    initial_value: '0'
+  - id: m2_dosed_total
+    type: float
+    restore_value: yes
+    initial_value: '0'
+  - id: m3_dosed_total
+    type: float
+    restore_value: yes
+    initial_value: '0'
+  - id: m4_dosed_total
+    type: float
+    restore_value: yes
+    initial_value: '0'
+
+  # These variables are used to store the time when a pump is started.
+  # They are not saved to flash memory, as they are only needed while the pump is running.
+  - id: m1_start_time
+    type: int
+    restore_value: no
+  - id: m2_start_time
+    type: int
+    restore_value: no
+  - id: m3_start_time
+    type: int
+    restore_value: no
+  - id: m4_start_time
+    type: int
+    restore_value: no
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "XYZ="
+
+# Keep this because you can't flash over the network without it
+ota:
+  - platform: esphome
+    password: "xyz"
+
+# ===================================================================
+# NEW: Time component
+# We need this to get the current time for calculating pump run duration.
+# ===================================================================
+time:
+  - platform: homeassistant
+    id: ha_time
+
+# Network interface for PoESP32
+ethernet:
+  type: IP101
+  mdc_pin: GPIO23
+  mdio_pin: GPIO18
+  phy_addr: 1
+  power_pin:
+    number: GPIO5
+  clk:
+    pin: GPIO0
+    mode: CLK_EXT_IN
+
+web_server:
+  port: 80
+
+# We've reversed the pins with the cable, swapping white and yellow
+# This enables Hardware UART on the PoESP32
+# If you're not getting any response, swap around GPIO16/17 and try again
+uart:
+  tx_pin: GPIO16
+  rx_pin: GPIO17
+  baud_rate: 115200
+  id: uart_bus
+
+number:
+  - platform: template
+    name: "Motor 1 Speed"
+    id: motor_1_speed
+    optimistic: true
+    min_value: 400
+    max_value: 2500
+    step: 10
+    # REMOVED: initial_value (now set from globals on boot)
+    # NEW: When the slider value changes, save it to the global variable.
+    on_value:
+      then:
+        - globals.set:
+            id: m1_speed
+            value: !lambda 'return x;'
+
+  - platform: template
+    name: "Motor 2 Speed"
+    id: motor_2_speed
+    optimistic: true
+    min_value: 400
+    max_value: 2500
+    step: 10
+    on_value:
+      then:
+        - globals.set:
+            id: m2_speed
+            value: !lambda 'return x;'
+
+  - platform: template
+    name: "Motor 3 Speed"
+    id: motor_3_speed
+    optimistic: true
+    min_value: 400
+    max_value: 2500
+    step: 10
+    on_value:
+      then:
+        - globals.set:
+            id: m3_speed
+            value: !lambda 'return x;'
+
+  - platform: template
+    name: "Motor 4 Speed"
+    id: motor_4_speed
+    optimistic: true
+    min_value: 400
+    max_value: 2500
+    step: 10
+    on_value:
+      then:
+        - globals.set:
+            id: m4_speed
+            value: !lambda 'return x;'
+
+button:
+  - platform: template
+    name: "Motor 1 Calibrate"
+    on_press:
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 1 CALIBRATE " + std::to_string((int)id(motor_1_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+  - platform: template
+    name: "Motor 2 Calibrate"
+    on_press:
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 2 CALIBRATE " + std::to_string((int)id(motor_2_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+  - platform: template
+    name: "Motor 3 Calibrate"
+    on_press:
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 3 CALIBRATE " + std::to_string((int)id(motor_3_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+  - platform: template
+    name: "Motor 4 Calibrate"
+    on_press:
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 4 CALIBRATE " + std::to_string((int)id(motor_4_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+
+  # ===================================================================
+  # NEW: Buttons for resetting the dosed amount counters
+  # ===================================================================
+  - platform: template
+    name: "Motor 1 Reset Dosed Amount"
+    on_press:
+      then:
+        # This sets the dosed amount for motor 1 back to 0.
+        - globals.set:
+            id: m1_dosed_total
+            value: '0'
+  - platform: template
+    name: "Motor 2 Reset Dosed Amount"
+    on_press:
+      then:
+        # This sets the dosed amount for motor 2 back to 0.
+        - globals.set:
+            id: m2_dosed_total
+            value: '0'
+  - platform: template
+    name: "Motor 3 Reset Dosed Amount"
+    on_press:
+      then:
+        # This sets the dosed amount for motor 3 back to 0.
+        - globals.set:
+            id: m3_dosed_total
+            value: '0'
+  - platform: template
+    name: "Motor 4 Reset Dosed Amount"
+    on_press:
+      then:
+        # This sets the dosed amount for motor 4 back to 0.
+        - globals.set:
+            id: m4_dosed_total
+            value: '0'
+
+
+switch:
+  - platform: template
+    name: "Motor 1 Power"
+    optimistic: true
+    id: motor_1_power
+    turn_on_action:
+      # When the pump is turned on, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 1 ON " + std::to_string((int)id(motor_1_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+      # Then, we record the current time in our global variable.
+      - globals.set:
+          id: m1_start_time
+          value: !lambda 'return id(ha_time).now().timestamp;'
+    turn_off_action:
+      # When the pump is turned off, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: "Motor 1 OFF\n"
+      # Then, we calculate how long the pump was running.
+      - lambda: |-
+          // Get the time when the pump was turned off.
+          auto end_time = id(ha_time).now().timestamp;
+          // Get the time when the pump was turned on.
+          auto start_time = id(m1_start_time);
+          // Calculate the difference in seconds.
+          float duration = end_time - start_time;
+          // Round up to the nearest whole second to be safe.
+          duration = ceil(duration);
+          // Calculate the amount dosed (duration in seconds * 10mL/second).
+          float dosed_amount = duration * 10;
+          // Add the newly dosed amount to our running total.
+          id(m1_dosed_total) += dosed_amount;
+
+  - platform: template
+    name: "Motor 1 Direction"
+    id: motor_1_direction
+    optimistic: true
+    # This setting correctly restores the last known state on reboot.
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 1 FWD\n"
+      - lambda: |-
+          id(motor_1_direction_text).publish_state("Forward");
+    turn_off_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 1 REV\n"
+      - lambda: |-
+          id(motor_1_direction_text).publish_state("Reverse");
+
+  - platform: template
+    name: "Motor 2 Power"
+    optimistic: true
+    id: motor_2_power
+    turn_on_action:
+      # When the pump is turned on, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 2 ON " + std::to_string((int)id(motor_2_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+      # Then, we record the current time in our global variable.
+      - globals.set:
+          id: m2_start_time
+          value: !lambda 'return id(ha_time).now().timestamp;'
+    turn_off_action:
+      # When the pump is turned off, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: "Motor 2 OFF\n"
+      # Then, we calculate how long the pump was running.
+      - lambda: |-
+          // Get the time when the pump was turned off.
+          auto end_time = id(ha_time).now().timestamp;
+          // Get the time when the pump was turned on.
+          auto start_time = id(m2_start_time);
+          // Calculate the difference in seconds.
+          float duration = end_time - start_time;
+          // Round up to the nearest whole second to be safe.
+          duration = ceil(duration);
+          // Calculate the amount dosed (duration in seconds * 10mL/second).
+          float dosed_amount = duration * 10;
+          // Add the newly dosed amount to our running total.
+          id(m2_dosed_total) += dosed_amount;
+
+  - platform: template
+    name: "Motor 2 Direction"
+    id: motor_2_direction
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 2 FWD\n"
+      - lambda: |-
+          id(motor_2_direction_text).publish_state("Forward");
+    turn_off_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 2 REV\n"
+      - lambda: |-
+          id(motor_2_direction_text).publish_state("Reverse");
+
+  - platform: template
+    name: "Motor 3 Power"
+    optimistic: true
+    id: motor_3_power
+    turn_on_action:
+      # When the pump is turned on, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 3 ON " + std::to_string((int)id(motor_3_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+      # Then, we record the current time in our global variable.
+      - globals.set:
+          id: m3_start_time
+          value: !lambda 'return id(ha_time).now().timestamp;'
+    turn_off_action:
+      # When the pump is turned off, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: "Motor 3 OFF\n"
+      # Then, we calculate how long the pump was running.
+      - lambda: |-
+          // Get the time when the pump was turned off.
+          auto end_time = id(ha_time).now().timestamp;
+          // Get the time when the pump was turned on.
+          auto start_time = id(m3_start_time);
+          // Calculate the difference in seconds.
+          float duration = end_time - start_time;
+          // Round up to the nearest whole second to be safe.
+          duration = ceil(duration);
+          // Calculate the amount dosed (duration in seconds * 10mL/second).
+          float dosed_amount = duration * 10;
+          // Add the newly dosed amount to our running total.
+          id(m3_dosed_total) += dosed_amount;
+
+  - platform: template
+    name: "Motor 3 Direction"
+    id: motor_3_direction
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 3 FWD\n"
+      - lambda: |-
+          id(motor_3_direction_text).publish_state("Forward");
+    turn_off_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 3 REV\n"
+      - lambda: |-
+          id(motor_3_direction_text).publish_state("Reverse");
+
+  - platform: template
+    name: "Motor 4 Power"
+    optimistic: true
+    id: motor_4_power
+    turn_on_action:
+      # When the pump is turned on, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: !lambda |-
+            std::string s = "Motor 4 ON " + std::to_string((int)id(motor_4_speed).state) + "\n";
+            return std::vector<unsigned char>(s.begin(), s.end());
+      # Then, we record the current time in our global variable.
+      - globals.set:
+          id: m4_start_time
+          value: !lambda 'return id(ha_time).now().timestamp;'
+    turn_off_action:
+      # When the pump is turned off, we first send the command to the motor controller.
+      - uart.write:
+          id: uart_bus
+          data: "Motor 4 OFF\n"
+      # Then, we calculate how long the pump was running.
+      - lambda: |-
+          // Get the time when the pump was turned off.
+          auto end_time = id(ha_time).now().timestamp;
+          // Get the time when the pump was turned on.
+          auto start_time = id(m4_start_time);
+          // Calculate the difference in seconds.
+          float duration = end_time - start_time;
+          // Round up to the nearest whole second to be safe.
+          duration = ceil(duration);
+          // Calculate the amount dosed (duration in seconds * 10mL/second).
+          float dosed_amount = duration * 10;
+          // Add the newly dosed amount to our running total.
+          id(m4_dosed_total) += dosed_amount;
+
+  - platform: template
+    name: "Motor 4 Direction"
+    id: motor_4_direction
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    turn_on_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 4 FWD\n"
+      - lambda: |-
+          id(motor_4_direction_text).publish_state("Forward");
+    turn_off_action:
+      - uart.write:
+          id: uart_bus
+          data: "Motor 4 REV\n"
+      - lambda: |-
+          id(motor_4_direction_text).publish_state("Reverse");
+
+text_sensor:
+  - platform: template
+    name: "Motor 1 Direction"
+    id: motor_1_direction_text
+    lambda: |-
+      if(id(motor_1_direction).state){
+        return {"Forward"};
+      }else{
+        return {"Reverse"};
+      }
+    update_interval: 60s
+
+  - platform: template
+    name: "Motor 2 Direction"
+    id: motor_2_direction_text
+    lambda: |-
+      if(id(motor_2_direction).state){
+        return {"Forward"};
+      }else{
+        return {"Reverse"};
+      }
+    update_interval: 60s
+
+  - platform: template
+    name: "Motor 3 Direction"
+    id: motor_3_direction_text
+    lambda: |-
+      if(id(motor_3_direction).state){
+        return {"Forward"};
+      }else{
+        return {"Reverse"};
+      }
+    update_interval: 60s
+
+  - platform: template
+    name: "Motor 4 Direction"
+    id: motor_4_direction_text
+    lambda: |-
+      if(id(motor_4_direction).state){
+        return {"Forward"};
+      }else{
+        return {"Reverse"};
+      }
+    update_interval: 60s
+
+  - platform: template
+    name: "Firmware Version"
+    id: fw_version_sensor
+    update_interval: 1s
+    lambda: |-
+      static std::string buffer;
+      while (id(uart_bus).available()) {
+        uint8_t byte;
+        id(uart_bus).read_byte(&byte);
+        char c = static_cast<char>(byte);
+
+        if (c == '\n' || c == '\r') {
+          if (buffer.rfind("FW:", 0) == 0) {
+            std::string version = buffer.substr(3);
+            buffer.clear();
+            return version;
+          } else if (buffer.rfind("Calibration for Motor", 0) == 0) {
+            id(calibration_status).publish_state(buffer);
+          }
+          buffer.clear();
+        } else {
+          buffer += c;
+        }
+      }
+      return {};
+  - platform: template
+    name: "Calibration Status"
+    id: calibration_status
+
+# ===================================================================
+# NEW: Sensors for displaying the total dosed amounts
+# ===================================================================
+sensor:
+  # This sensor will show the total amount dosed by motor 1.
+  - platform: template
+    name: "Motor 1 Dosed Amount"
+    unit_of_measurement: "mL"
+    lambda: |-
+      return id(m1_dosed_total);
+    update_interval: 1s
+  # This sensor will show the total amount dosed by motor 2.
+  - platform: template
+    name: "Motor 2 Dosed Amount"
+    unit_of_measurement: "mL"
+    lambda: |-
+      return id(m2_dosed_total);
+    update_interval: 1s
+  # This sensor will show the total amount dosed by motor 3.
+  - platform: template
+    name: "Motor 3 Dosed Amount"
+    unit_of_measurement: "mL"
+    lambda: |-
+      return id(m3_dosed_total);
+    update_interval: 1s
+  # This sensor will show the total amount dosed by motor 4.
+  - platform: template
+    name: "Motor 4 Dosed Amount"
+    unit_of_measurement: "mL"
+    lambda: |-
+      return id(m4_dosed_total);
+    update_interval: 1s
