@@ -310,18 +310,24 @@ switch:
           data: "Motor 1 OFF\n"
       # Then, we calculate how long the pump was running.
       - lambda: |-
-          // Get the time when the pump was turned off.
-          auto end_time = id(ha_time).now().timestamp;
           // Get the time when the pump was turned on.
           auto start_time = id(m1_start_time);
-          // Calculate the difference in seconds.
-          float duration = end_time - start_time;
-          // Round up to the nearest whole second to be safe.
-          duration = ceil(duration);
-          // Calculate the amount dosed (duration in seconds * 10mL/second).
-          float dosed_amount = duration * 10;
-          // Add the newly dosed amount to our running total.
-          id(m1_dosed_total) += dosed_amount;
+          // Only calculate the dosed amount if the pump was actually started.
+          // This prevents a bug on reboot where a random, large value is calculated.
+          if (start_time > 0) {
+            // Get the time when the pump was turned off.
+            auto end_time = id(ha_time).now().timestamp;
+            // Calculate the difference in seconds.
+            float duration = end_time - start_time;
+            // Round up to the nearest whole second to be safe.
+            duration = ceil(duration);
+            // Calculate the amount dosed (duration in seconds * 10mL/second).
+            float dosed_amount = duration * 10;
+            // Add the newly dosed amount to our running total.
+            id(m1_dosed_total) += dosed_amount;
+            // Reset the start time so we don't re-calculate on the next 'off' command.
+            id(m1_start_time) = 0;
+          }
 
   - platform: template
     name: "Motor 1 Direction"
@@ -364,18 +370,24 @@ switch:
           data: "Motor 2 OFF\n"
       # Then, we calculate how long the pump was running.
       - lambda: |-
-          // Get the time when the pump was turned off.
-          auto end_time = id(ha_time).now().timestamp;
           // Get the time when the pump was turned on.
           auto start_time = id(m2_start_time);
-          // Calculate the difference in seconds.
-          float duration = end_time - start_time;
-          // Round up to the nearest whole second to be safe.
-          duration = ceil(duration);
-          // Calculate the amount dosed (duration in seconds * 10mL/second).
-          float dosed_amount = duration * 10;
-          // Add the newly dosed amount to our running total.
-          id(m2_dosed_total) += dosed_amount;
+          // Only calculate the dosed amount if the pump was actually started.
+          // This prevents a bug on reboot where a random, large value is calculated.
+          if (start_time > 0) {
+            // Get the time when the pump was turned off.
+            auto end_time = id(ha_time).now().timestamp;
+            // Calculate the difference in seconds.
+            float duration = end_time - start_time;
+            // Round up to the nearest whole second to be safe.
+            duration = ceil(duration);
+            // Calculate the amount dosed (duration in seconds * 10mL/second).
+            float dosed_amount = duration * 10;
+            // Add the newly dosed amount to our running total.
+            id(m2_dosed_total) += dosed_amount;
+            // Reset the start time so we don't re-calculate on the next 'off' command.
+            id(m2_start_time) = 0;
+          }
 
   - platform: template
     name: "Motor 2 Direction"
@@ -417,18 +429,24 @@ switch:
           data: "Motor 3 OFF\n"
       # Then, we calculate how long the pump was running.
       - lambda: |-
-          // Get the time when the pump was turned off.
-          auto end_time = id(ha_time).now().timestamp;
           // Get the time when the pump was turned on.
           auto start_time = id(m3_start_time);
-          // Calculate the difference in seconds.
-          float duration = end_time - start_time;
-          // Round up to the nearest whole second to be safe.
-          duration = ceil(duration);
-          // Calculate the amount dosed (duration in seconds * 10mL/second).
-          float dosed_amount = duration * 10;
-          // Add the newly dosed amount to our running total.
-          id(m3_dosed_total) += dosed_amount;
+          // Only calculate the dosed amount if the pump was actually started.
+          // This prevents a bug on reboot where a random, large value is calculated.
+          if (start_time > 0) {
+            // Get the time when the pump was turned off.
+            auto end_time = id(ha_time).now().timestamp;
+            // Calculate the difference in seconds.
+            float duration = end_time - start_time;
+            // Round up to the nearest whole second to be safe.
+            duration = ceil(duration);
+            // Calculate the amount dosed (duration in seconds * 10mL/second).
+            float dosed_amount = duration * 10;
+            // Add the newly dosed amount to our running total.
+            id(m3_dosed_total) += dosed_amount;
+            // Reset the start time so we don't re-calculate on the next 'off' command.
+            id(m3_start_time) = 0;
+          }
 
   - platform: template
     name: "Motor 3 Direction"
@@ -470,18 +488,24 @@ switch:
           data: "Motor 4 OFF\n"
       # Then, we calculate how long the pump was running.
       - lambda: |-
-          // Get the time when the pump was turned off.
-          auto end_time = id(ha_time).now().timestamp;
           // Get the time when the pump was turned on.
           auto start_time = id(m4_start_time);
-          // Calculate the difference in seconds.
-          float duration = end_time - start_time;
-          // Round up to the nearest whole second to be safe.
-          duration = ceil(duration);
-          // Calculate the amount dosed (duration in seconds * 10mL/second).
-          float dosed_amount = duration * 10;
-          // Add the newly dosed amount to our running total.
-          id(m4_dosed_total) += dosed_amount;
+          // Only calculate the dosed amount if the pump was actually started.
+          // This prevents a bug on reboot where a random, large value is calculated.
+          if (start_time > 0) {
+            // Get the time when the pump was turned off.
+            auto end_time = id(ha_time).now().timestamp;
+            // Calculate the difference in seconds.
+            float duration = end_time - start_time;
+            // Round up to the nearest whole second to be safe.
+            duration = ceil(duration);
+            // Calculate the amount dosed (duration in seconds * 10mL/second).
+            float dosed_amount = duration * 10;
+            // Add the newly dosed amount to our running total.
+            id(m4_dosed_total) += dosed_amount;
+            // Reset the start time so we don't re-calculate on the next 'off' command.
+            id(m4_start_time) = 0;
+          }
 
   - platform: template
     name: "Motor 4 Direction"
@@ -585,25 +609,25 @@ sensor:
     unit_of_measurement: "mL"
     lambda: |-
       return id(m1_dosed_total);
-    update_interval: 1s
+    update_interval: 60s
   # This sensor will show the total amount dosed by motor 2.
   - platform: template
     name: "Motor 2 Dosed Amount"
     unit_of_measurement: "mL"
     lambda: |-
       return id(m2_dosed_total);
-    update_interval: 1s
+    update_interval: 60s
   # This sensor will show the total amount dosed by motor 3.
   - platform: template
     name: "Motor 3 Dosed Amount"
     unit_of_measurement: "mL"
     lambda: |-
       return id(m3_dosed_total);
-    update_interval: 1s
+    update_interval: 60s
   # This sensor will show the total amount dosed by motor 4.
   - platform: template
     name: "Motor 4 Dosed Amount"
     unit_of_measurement: "mL"
     lambda: |-
       return id(m4_dosed_total);
-    update_interval: 1s
+    update_interval: 60s
